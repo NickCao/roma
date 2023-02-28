@@ -1,7 +1,7 @@
 use libc::c_void;
 use roma::*;
 use socket2::{Domain, Protocol, Socket, Type};
-use std::{net::SocketAddr, os::fd::AsRawFd, ptr::null_mut};
+use std::{ffi::c_int, net::SocketAddr, os::fd::AsRawFd, ptr::null_mut};
 
 fn main() {
     let socket = Socket::new(
@@ -38,4 +38,34 @@ fn main() {
         )
     };
     assert!(!(ret < 0));
+
+    let mut source: libc::sockaddr_storage = unsafe { std::mem::zeroed() };
+    let mut recv_args: homa_recvmsg_args = unsafe { std::mem::zeroed() };
+
+    let mut hdr = libc::msghdr {
+        msg_name: std::ptr::addr_of_mut!(source) as *mut c_void,
+        msg_namelen: std::mem::size_of::<libc::sockaddr_storage>() as u32,
+        msg_iov: std::ptr::null_mut() as *mut libc::iovec,
+        msg_iovlen: 0,
+        msg_control: std::ptr::addr_of_mut!(recv_args) as *mut c_void,
+        msg_controllen: std::mem::size_of::<homa_recvmsg_args>(),
+        msg_flags: 0,
+    };
+
+    loop {
+        recv_args.id = 0;
+        recv_args.flags = HOMA_RECVMSG_REQUEST;
+        let length = unsafe {
+            libc::recvmsg(
+                socket.as_raw_fd(),
+                std::ptr::addr_of_mut!(hdr) as *mut libc::msghdr,
+                0,
+            )
+        };
+        assert!(!(length < 0));
+        let resp_length = unsafe {
+            *(start.offset(recv_args.bpage_offsets[0] as isize) as *const c_int).offset(1)
+        };
+        dbg!(resp_length);
+    }
 }
