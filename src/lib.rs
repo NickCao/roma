@@ -1,5 +1,7 @@
-use core::slice;
 use libc::{c_void, size_t};
+use socket2::{Domain, Socket, Type};
+use std::io::{Error, ErrorKind, Result};
+use std::net::{SocketAddr, ToSocketAddrs};
 use std::{ffi::c_int, isize, mem::size_of, ptr::addr_of_mut};
 
 pub const IPPROTO_HOMA: i32 = 0xFD;
@@ -11,6 +13,18 @@ pub const HOMA_MAX_BPAGES: usize =
     (HOMA_MAX_MESSAGE_LENGTH + HOMA_BPAGE_SIZE - 1) >> HOMA_BPAGE_SHIFT;
 
 pub const HOMA_RECVMSG_REQUEST: c_int = 0x01;
+
+pub struct HomaSocket {
+    pub socket: Socket,
+}
+
+impl HomaSocket {
+    pub fn new(domain: Domain) -> Result<Self> {
+        Ok(Self {
+            socket: Socket::new_raw(domain, Type::DGRAM, Some(IPPROTO_HOMA.into()))?,
+        })
+    }
+}
 
 #[allow(non_camel_case_types)]
 #[repr(C)]
