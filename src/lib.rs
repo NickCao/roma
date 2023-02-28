@@ -47,7 +47,7 @@ pub fn homa_send(
     dest_addr: *const libc::sockaddr_storage,
     id: *mut u64,
     completion_cookie: u64,
-) -> ssize_t {
+) -> isize {
     let mut args = homa_sendmsg_args {
         id: 0,
         completion_cookie,
@@ -69,5 +69,33 @@ pub fn homa_send(
     if result >= 0 && !id.is_null() {
         unsafe { *id = args.id };
     }
+    result
+}
+
+pub fn homa_reply(
+    sockfd: c_int,
+    message_buf: *mut c_void,
+    length: size_t,
+    dest_addr: *mut libc::sockaddr_storage,
+    id: u64,
+) -> isize {
+    let mut args = homa_sendmsg_args {
+        id,
+        completion_cookie: 0,
+    };
+    let mut vec = libc::iovec {
+        iov_base: message_buf,
+        iov_len: length,
+    };
+    let mut hdr = libc::msghdr {
+        msg_name: dest_addr as *mut c_void,
+        msg_namelen: size_of::<libc::sockaddr_storage>() as u32,
+        msg_iov: addr_of_mut!(vec),
+        msg_iovlen: 1,
+        msg_control: addr_of_mut!(args) as *mut c_void,
+        msg_controllen: 0,
+        msg_flags: 0,
+    };
+    let result = unsafe { libc::sendmsg(sockfd, addr_of_mut!(hdr), 0) };
     result
 }
