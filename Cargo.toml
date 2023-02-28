@@ -5,4 +5,5 @@ edition = "2021"
 
 [dependencies]
 libc = "0.2.139"
-socket2 = "*"
+socket2 = "0.5.1"
+memmap2 = "0.5.10"

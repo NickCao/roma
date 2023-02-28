@@ -1,4 +1,5 @@
 use libc::{c_void, size_t};
+use memmap2::{Mmap, MmapMut, MmapOptions};
 use socket2::{Domain, Socket, Type};
 use std::io::{Error, ErrorKind, Result};
 use std::os::fd::AsRawFd;
@@ -16,6 +17,7 @@ pub const HOMA_RECVMSG_REQUEST: c_int = 0x01;
 
 pub struct HomaSocket {
     pub socket: Socket,
+    pub buffer: MmapMut,
 }
 
 impl HomaSocket {
@@ -23,22 +25,11 @@ impl HomaSocket {
         let socket = Socket::new_raw(domain, Type::DGRAM, Some(IPPROTO_HOMA.into()))?;
 
         let length = pages * HOMA_BPAGE_SIZE;
-        let buffer = unsafe {
-            libc::mmap(
-                std::ptr::null_mut() as *mut c_void,
-                length,
-                libc::PROT_READ | libc::PROT_WRITE,
-                libc::MAP_PRIVATE | libc::MAP_ANONYMOUS,
-                0,
-                0,
-            )
-        };
-
-        assert_ne!(buffer, libc::MAP_FAILED);
+        let mut buffer = MmapOptions::new().len(length).map_anon()?;
 
         let set_buf_args = homa_set_buf_args {
-            start: buffer,
-            length,
+            start: buffer.as_mut_ptr() as *mut c_void,
+            length: buffer.len(),
         };
 
         let result = unsafe {
@@ -53,7 +44,7 @@ impl HomaSocket {
 
         assert!(result >= 0);
 
-        Ok(Self { socket })
+        Ok(Self { socket, buffer })
     }
 }
 
