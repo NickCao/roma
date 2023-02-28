@@ -1,13 +1,7 @@
-use std::{net::SocketAddr, os::fd::AsRawFd, ptr::null_mut};
-
 use libc::c_void;
-use roma::homa_set_buf_args;
+use roma::*;
 use socket2::{Domain, Protocol, Socket, Type};
-
-const IPPROTO_HOMA: i32 = 0xFD;
-const SO_HOMA_SET_BUF: i32 = 10;
-const HOMA_BPAGE_SHIFT: usize = 16;
-const HOMA_BPAGE_SIZE: usize = 1 << HOMA_BPAGE_SHIFT;
+use std::{net::SocketAddr, os::fd::AsRawFd, ptr::null_mut};
 
 fn main() {
     let socket = Socket::new(
