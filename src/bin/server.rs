@@ -1,14 +1,13 @@
 use libc::c_void;
 use roma::*;
 use std::{
-    ffi::c_int,
     mem::size_of,
     ptr::{addr_of, addr_of_mut, null_mut},
 };
 
 fn main() {
     let sockfd = homa_socket(libc::AF_INET);
-    assert!(!(sockfd < 0));
+    assert!(sockfd >= 0);
 
     let listen_addr = libc::sockaddr_in {
         sin_family: libc::AF_INET as u16,
@@ -51,7 +50,7 @@ fn main() {
             std::mem::size_of::<homa_set_buf_args>() as u32,
         )
     };
-    assert!(!(result < 0));
+    assert!(result >= 0);
 
     let mut source: libc::sockaddr_storage = unsafe { std::mem::zeroed() };
     let mut recv_args: homa_recvmsg_args = unsafe { std::mem::zeroed() };

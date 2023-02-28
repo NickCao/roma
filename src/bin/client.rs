@@ -7,7 +7,7 @@ use std::{
 
 fn main() {
     let sockfd = homa_socket(libc::AF_INET);
-    assert!(!(sockfd < 0));
+    assert!(sockfd >= 0);
 
     let src_addr = libc::sockaddr_in {
         sin_family: libc::AF_INET as u16,
