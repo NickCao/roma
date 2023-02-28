@@ -1,18 +1,32 @@
 use libc::c_void;
 use roma::*;
-use socket2::{Domain, Protocol, Socket, Type};
-use std::{ffi::c_int, net::SocketAddr, os::fd::AsRawFd, ptr::null_mut};
+use std::{
+    ffi::c_int,
+    mem::size_of,
+    ptr::{addr_of, addr_of_mut, null_mut},
+};
 
 fn main() {
-    let socket = Socket::new(
-        Domain::IPV4,
-        Type::DGRAM,
-        Some(Protocol::from(IPPROTO_HOMA)),
-    )
-    .unwrap();
-    socket
-        .bind(&"127.0.0.1:4000".parse::<SocketAddr>().unwrap().into())
-        .unwrap();
+    let sockfd = homa_socket(libc::AF_INET);
+    assert!(!(sockfd < 0));
+
+    let listen_addr = libc::sockaddr_in {
+        sin_family: libc::AF_INET as u16,
+        sin_port: 4000u16.to_be(),
+        sin_addr: libc::in_addr {
+            s_addr: libc::INADDR_LOOPBACK.to_be(),
+        },
+        sin_zero: [0; 8],
+    };
+
+    let result = unsafe {
+        libc::bind(
+            sockfd,
+            addr_of!(listen_addr) as *const libc::sockaddr,
+            size_of::<libc::sockaddr_in>() as u32,
+        )
+    };
+    assert_eq!(result, 0);
 
     let length = 1000 * HOMA_BPAGE_SIZE;
     let start = unsafe {
@@ -28,16 +42,16 @@ fn main() {
     assert_ne!(start, libc::MAP_FAILED);
 
     let args = homa_set_buf_args { start, length };
-    let ret = unsafe {
+    let result = unsafe {
         libc::setsockopt(
-            socket.as_raw_fd(),
+            sockfd,
             IPPROTO_HOMA,
             SO_HOMA_SET_BUF,
             std::ptr::addr_of!(args) as *const c_void,
             std::mem::size_of::<homa_set_buf_args>() as u32,
         )
     };
-    assert!(ret >= 0);
+    assert!(!(result < 0));
 
     let mut source: libc::sockaddr_storage = unsafe { std::mem::zeroed() };
     let mut recv_args: homa_recvmsg_args = unsafe { std::mem::zeroed() };
@@ -55,17 +69,8 @@ fn main() {
     loop {
         recv_args.id = 0;
         recv_args.flags = HOMA_RECVMSG_REQUEST;
-        let length = unsafe {
-            libc::recvmsg(
-                socket.as_raw_fd(),
-                std::ptr::addr_of_mut!(hdr) as *mut libc::msghdr,
-                0,
-            )
-        };
+        let length = unsafe { libc::recvmsg(sockfd, addr_of_mut!(hdr) as *mut libc::msghdr, 0) };
         assert!(length >= 0);
-        let resp_length = unsafe {
-            *(start.offset(recv_args.bpage_offsets[0] as isize) as *const c_int).offset(1)
-        };
-        dbg!(resp_length);
+        dbg!(unsafe { (*(hdr.msg_control as *const homa_recvmsg_args)).id });
     }
 }
