@@ -37,7 +37,7 @@ fn main() {
             std::mem::size_of::<homa_set_buf_args>() as u32,
         )
     };
-    assert!(!(ret < 0));
+    assert!(ret >= 0);
 
     let mut source: libc::sockaddr_storage = unsafe { std::mem::zeroed() };
     let mut recv_args: homa_recvmsg_args = unsafe { std::mem::zeroed() };
@@ -62,7 +62,7 @@ fn main() {
                 0,
             )
         };
-        assert!(!(length < 0));
+        assert!(length >= 0);
         let resp_length = unsafe {
             *(start.offset(recv_args.bpage_offsets[0] as isize) as *const c_int).offset(1)
         };

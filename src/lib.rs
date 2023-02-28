@@ -1,4 +1,4 @@
-use libc::{c_void, size_t, ssize_t};
+use libc::{c_void, size_t};
 use std::{ffi::c_int, isize, mem::size_of, ptr::addr_of_mut};
 
 pub const IPPROTO_HOMA: i32 = 0xFD;
@@ -96,6 +96,6 @@ pub fn homa_reply(
         msg_controllen: 0,
         msg_flags: 0,
     };
-    let result = unsafe { libc::sendmsg(sockfd, addr_of_mut!(hdr), 0) };
-    result
+    
+    unsafe { libc::sendmsg(sockfd, addr_of_mut!(hdr), 0) }
 }
