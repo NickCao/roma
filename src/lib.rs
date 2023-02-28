@@ -1,7 +1,7 @@
 use libc::{c_void, size_t};
 use socket2::{Domain, Socket, Type};
 use std::io::{Error, ErrorKind, Result};
-use std::net::{SocketAddr, ToSocketAddrs};
+use std::os::fd::AsRawFd;
 use std::{ffi::c_int, isize, mem::size_of, ptr::addr_of_mut};
 
 pub const IPPROTO_HOMA: i32 = 0xFD;
@@ -19,10 +19,41 @@ pub struct HomaSocket {
 }
 
 impl HomaSocket {
-    pub fn new(domain: Domain) -> Result<Self> {
-        Ok(Self {
-            socket: Socket::new_raw(domain, Type::DGRAM, Some(IPPROTO_HOMA.into()))?,
-        })
+    pub fn new(domain: Domain, pages: usize) -> Result<Self> {
+        let socket = Socket::new_raw(domain, Type::DGRAM, Some(IPPROTO_HOMA.into()))?;
+
+        let length = pages * HOMA_BPAGE_SIZE;
+        let buffer = unsafe {
+            libc::mmap(
+                std::ptr::null_mut() as *mut c_void,
+                length,
+                libc::PROT_READ | libc::PROT_WRITE,
+                libc::MAP_PRIVATE | libc::MAP_ANONYMOUS,
+                0,
+                0,
+            )
+        };
+
+        assert_ne!(buffer, libc::MAP_FAILED);
+
+        let set_buf_args = homa_set_buf_args {
+            start: buffer,
+            length,
+        };
+
+        let result = unsafe {
+            libc::setsockopt(
+                socket.as_raw_fd(),
+                IPPROTO_HOMA,
+                SO_HOMA_SET_BUF,
+                &set_buf_args as *const homa_set_buf_args as *const c_void,
+                size_of::<homa_set_buf_args>() as u32,
+            )
+        };
+
+        assert!(result >= 0);
+
+        Ok(Self { socket })
     }
 }
 
