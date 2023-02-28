@@ -3,6 +3,7 @@ use roma::*;
 use std::{
     mem::size_of,
     ptr::{addr_of, addr_of_mut, null_mut},
+    slice,
 };
 
 fn main() {
@@ -70,6 +71,17 @@ fn main() {
         recv_args.flags = HOMA_RECVMSG_REQUEST;
         let length = unsafe { libc::recvmsg(sockfd, addr_of_mut!(hdr) as *mut libc::msghdr, 0) };
         assert!(length >= 0);
-        dbg!(unsafe { (*(hdr.msg_control as *const homa_recvmsg_args)).id });
+        let mut payload = vec![];
+        dbg!(recv_args.num_bpages);
+        for page in 0..recv_args.num_bpages as usize {
+            dbg!(recv_args.bpage_offsets[page]);
+            unsafe {
+                payload.extend_from_slice(slice::from_raw_parts(
+                    (start as *const u8).offset(recv_args.bpage_offsets[page] as isize),
+                    HOMA_BPAGE_SIZE,
+                ));
+            }
+        }
+        dbg!(&payload[..length as usize]);
     }
 }
