@@ -1,31 +1,13 @@
 use libc::c_void;
 use roma::*;
+use socket2::Domain;
 use std::{
-    mem::size_of,
+    os::fd::AsRawFd,
     ptr::{addr_of, addr_of_mut},
-    slice,
 };
 
 fn main() {
-    let sockfd = homa_socket(libc::AF_INET);
-    assert!(sockfd >= 0);
-
-    let src_addr = libc::sockaddr_in {
-        sin_family: libc::AF_INET as u16,
-        sin_port: 4001u16.to_be(),
-        sin_addr: libc::in_addr {
-            s_addr: libc::INADDR_ANY,
-        },
-        sin_zero: [0; 8],
-    };
-    let result = unsafe {
-        libc::bind(
-            sockfd,
-            addr_of!(src_addr) as *const libc::sockaddr,
-            size_of::<libc::sockaddr_in>() as u32,
-        )
-    };
-    assert_eq!(result, 0);
+    let socket = HomaSocket::new(Domain::IPV4, 1000).unwrap();
 
     let mut message = b"hello homa".to_vec();
     let mut id = 0;
@@ -38,7 +20,7 @@ fn main() {
         sin_zero: [0; 8],
     };
     let result = homa_send(
-        sockfd,
+        socket.socket.as_raw_fd(),
         message.as_mut_ptr() as *mut c_void,
         message.len(),
         addr_of!(dest_addr) as *const libc::sockaddr_storage,
