@@ -1,4 +1,4 @@
-use libc::c_void;
+use libc::{c_void, memset};
 use roma::*;
 use std::{
     mem::size_of,
@@ -31,7 +31,7 @@ fn main() {
     let length = 1000 * HOMA_BPAGE_SIZE;
     let start = unsafe {
         libc::mmap(
-            null_mut() as *mut c_void,
+            0 as *mut c_void,
             length,
             libc::PROT_READ | libc::PROT_WRITE,
             libc::MAP_PRIVATE | libc::MAP_ANONYMOUS,
@@ -40,6 +40,7 @@ fn main() {
         )
     };
     assert_ne!(start, libc::MAP_FAILED);
+    unsafe { memset(start, 0, length) };
 
     let args = homa_set_buf_args { start, length };
     let result = unsafe {
@@ -82,6 +83,6 @@ fn main() {
                 ));
             }
         }
-        dbg!(&payload[..length as usize]);
+        dbg!(std::str::from_utf8(&payload[..length as usize]));
     }
 }

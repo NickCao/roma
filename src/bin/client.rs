@@ -3,6 +3,7 @@ use roma::*;
 use std::{
     mem::size_of,
     ptr::{addr_of, addr_of_mut},
+    slice,
 };
 
 fn main() {
@@ -26,7 +27,7 @@ fn main() {
     };
     assert_eq!(result, 0);
 
-    let mut message = b"hello homa";
+    let mut message = b"hello homa".to_vec();
     let mut id = 0;
     let dest_addr = libc::sockaddr_in {
         sin_family: libc::AF_INET as u16,
@@ -38,7 +39,7 @@ fn main() {
     };
     let result = homa_send(
         sockfd,
-        addr_of_mut!(message) as *mut c_void,
+        message.as_mut_ptr() as *mut c_void,
         message.len(),
         addr_of!(dest_addr) as *const libc::sockaddr_storage,
         addr_of_mut!(id),

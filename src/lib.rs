@@ -1,3 +1,4 @@
+use core::slice;
 use libc::{c_void, size_t};
 use std::{ffi::c_int, isize, mem::size_of, ptr::addr_of_mut};
 
@@ -96,6 +97,6 @@ pub fn homa_reply(
         msg_controllen: 0,
         msg_flags: 0,
     };
-    
+
     unsafe { libc::sendmsg(sockfd, addr_of_mut!(hdr), 0) }
 }
