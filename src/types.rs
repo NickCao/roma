@@ -1,5 +1,6 @@
 use crate::consts;
 use libc::{c_int, c_void, size_t};
+use memmap2::MmapMut;
 
 #[allow(non_camel_case_types)]
 #[repr(C)]
@@ -7,6 +8,15 @@ use libc::{c_int, c_void, size_t};
 pub struct homa_set_buf_args {
     pub start: *mut c_void,
     pub length: size_t,
+}
+
+impl From<&mut MmapMut> for homa_set_buf_args {
+    fn from(value: &mut MmapMut) -> Self {
+        Self {
+            start: value.as_mut_ptr().cast(),
+            length: value.len(),
+        }
+    }
 }
 
 #[allow(non_camel_case_types)]

@@ -24,10 +24,7 @@ impl HomaSocket {
         let length = pages * consts::HOMA_BPAGE_SIZE;
         let mut buffer = MmapOptions::new().len(length).map_anon()?;
 
-        let set_buf_args = types::homa_set_buf_args {
-            start: buffer.as_mut_ptr() as *mut c_void,
-            length: buffer.len(),
-        };
+        let set_buf_args = types::homa_set_buf_args::from(&mut buffer);
 
         let result = unsafe {
             libc::setsockopt(
