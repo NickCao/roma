@@ -3,6 +3,7 @@
 
 use libc::c_void;
 use memmap2::{MmapMut, MmapOptions};
+use nix::sys::socket::SetSockOpt;
 use socket2::{Domain, SockAddr, Socket, Type};
 use std::cmp::min;
 use std::io::{Error, IoSlice, Result};
@@ -24,9 +25,9 @@ impl HomaSocket {
         let socket = Socket::new_raw(domain, Type::DGRAM, Some(consts::IPPROTO_HOMA.into()))?;
 
         let length = pages * consts::HOMA_BPAGE_SIZE;
-        let mut buffer = MmapOptions::new().len(length).map_anon()?;
+        let buffer = MmapOptions::new().len(length).map_anon()?;
 
-        let set_buf_args = types::homa_set_buf_args::from(&mut buffer);
+        let set_buf_args = types::homa_set_buf_args::from(&buffer);
 
         let result = unsafe {
             libc::setsockopt(

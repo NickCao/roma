@@ -1,22 +1,46 @@
-use std::default::default;
+use std::{default::default, mem::size_of};
 
 use crate::consts;
-use libc::{c_int, c_void, size_t};
+use libc::{c_int, c_void, size_t, socklen_t};
 use memmap2::MmapMut;
+use nix::{errno::Errno, sys::socket::SetSockOpt};
 
 #[allow(non_camel_case_types)]
 #[repr(C)]
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct homa_set_buf_args {
     pub start: *mut c_void,
     pub length: size_t,
 }
 
-impl From<&mut MmapMut> for homa_set_buf_args {
-    fn from(value: &mut MmapMut) -> Self {
+impl From<&MmapMut> for homa_set_buf_args {
+    fn from(value: &MmapMut) -> Self {
         Self {
-            start: value.as_mut_ptr().cast(),
+            start: value.as_ptr().cast_mut().cast(),
             length: value.len(),
+        }
+    }
+}
+
+#[derive(Clone)]
+pub struct HomaBuf;
+
+impl SetSockOpt for HomaBuf {
+    type Val = MmapMut;
+
+    fn set(&self, fd: std::os::fd::RawFd, val: &Self::Val) -> nix::Result<()> {
+        unsafe {
+            let args: homa_set_buf_args = val.into();
+
+            let res = libc::setsockopt(
+                fd,
+                consts::IPPROTO_HOMA,
+                consts::SO_HOMA_SET_BUF,
+                &args as *const homa_set_buf_args as *const c_void,
+                size_of::<homa_set_buf_args>() as socklen_t,
+            );
+
+            Errno::result(res).map(drop)
         }
     }
 }
