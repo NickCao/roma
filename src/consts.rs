@@ -12,10 +12,13 @@ pub const HOMA_BPAGE_SIZE: usize = 1 << 16;
 /// The largest number of bpages that will be required to store an incoming message.
 pub const HOMA_MAX_BPAGES: usize = HOMA_MAX_MESSAGE_LENGTH.div_ceil(HOMA_BPAGE_SIZE);
 
-pub const HOMA_RECVMSG_REQUEST: c_int = 0x01;
-pub const HOMA_RECVMSG_RESPONSE: c_int = 0x02;
-pub const HOMA_RECVMSG_NONBLOCKING: c_int = 0x04;
-pub const HOMA_RECVMSG_VALID_FLAGS: c_int = 0x07;
+bitflags::bitflags! {
+    pub struct HomaRecvmsgFlags: c_int {
+        const REQUEST = 0x01;
+        const RESPONSE = 0x02;
+        const NONBLOCKING = 0x04;
+    }
+}
 
 /// setsockopt option for specifying buffer region.
 pub const SO_HOMA_SET_BUF: i32 = 10;

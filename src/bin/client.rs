@@ -13,7 +13,7 @@ fn main() {
         let data = [IoSlice::new(&hello), IoSlice::new(&homa)];
         let id = socket.send(dest, &data, 0, i as u64).unwrap();
         let resp = socket
-            .recv(id, consts::HOMA_RECVMSG_RESPONSE, &buf)
+            .recv(id, consts::HomaRecvmsgFlags::RESPONSE, &buf)
             .unwrap();
         assert_eq!(i as u64, resp.1);
         buf = resp.2;

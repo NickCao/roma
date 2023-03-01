@@ -10,7 +10,9 @@ fn main() {
 
     let mut bufs = vec![];
     loop {
-        let (id, _, nbufs, addr) = socket.recv(0, consts::HOMA_RECVMSG_REQUEST, &bufs).unwrap();
+        let (id, _, nbufs, addr) = socket
+            .recv(0, consts::HomaRecvmsgFlags::REQUEST, &bufs)
+            .unwrap();
         socket.send(addr.unwrap(), &nbufs, id, 0).unwrap();
         bufs = nbufs;
     }

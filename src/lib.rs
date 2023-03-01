@@ -72,11 +72,11 @@ impl HomaSocket {
     pub fn recv(
         &self,
         id: u64,
-        flags: c_int,
+        flags: consts::HomaRecvmsgFlags,
         bufs: &[IoSlice<'_>],
     ) -> Result<(u64, u64, Vec<IoSlice<'_>>, Option<SocketAddr>)> {
         log::debug!(
-            "HomaSocket::recv(id: {}, flags: {}, bufs: {})",
+            "HomaSocket::recv(id: {}, flags: {:?}, bufs: {})",
             id,
             flags,
             bufs.len(),
@@ -95,7 +95,7 @@ impl HomaSocket {
         let recvmsg_args = types::homa_recvmsg_args {
             id,
             completion_cookie: 0,
-            flags,
+            flags: flags.bits(),
             num_bpages: bufs.len() as u32,
             pad: [0; 2],
             bpage_offsets,
@@ -110,7 +110,13 @@ impl HomaSocket {
             msg_flags: 0,
         };
 
-        let length = unsafe { libc::recvmsg(self.socket.as_raw_fd(), &mut hdr, 0) };
+        let length = unsafe {
+            libc::recvmsg(
+                self.socket.as_raw_fd(),
+                &mut hdr,
+                0, // flags are ignored
+            )
+        };
         if length < 0 {
             return Err(Error::last_os_error());
         }
