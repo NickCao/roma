@@ -9,6 +9,7 @@ use std::cmp::min;
 use std::io::{Error, IoSlice, Result};
 use std::net::SocketAddr;
 use std::os::fd::AsRawFd;
+use std::ptr::null_mut;
 use std::{ffi::c_int, mem::size_of};
 
 use crate::types::HomaBuf;
@@ -32,6 +33,84 @@ impl HomaSocket {
         setsockopt(socket.as_raw_fd(), HomaBuf, &buffer).unwrap();
 
         Ok(Self { socket, buffer })
+    }
+
+    pub fn roundtrip(
+        &self,
+        dest_addr: SocketAddr,
+        data: &[IoSlice<'_>],
+        bufs: &[IoSlice<'_>],
+    ) -> Result<Vec<IoSlice<'_>>> {
+        log::debug!("HomaSocket::roundtrip(dest_addr: {})", dest_addr);
+
+        let mut bpage_offsets = [0; consts::HOMA_MAX_BPAGES];
+        unsafe {
+            let bufs: Vec<u32> = bufs
+                .iter()
+                .map(|x| x.as_ptr().offset_from(self.buffer.as_ptr()) as u32)
+                .collect();
+            bpage_offsets[..bufs.len()].copy_from_slice(&bufs);
+        }
+
+        // abusing the fact that homa_sendmsg_args and homa_recvmsg_args
+        // has the same layout in the begining
+        let args = types::homa_recvmsg_args {
+            id: 0,
+            completion_cookie: 0, // omitted for now
+            flags: consts::HomaRecvmsgFlags::RESPONSE.bits(),
+            num_bpages: bufs.len() as u32,
+            pad: [0; 2],
+            bpage_offsets,
+        };
+
+        let dest_addr: SockAddr = dest_addr.into();
+        let send_hdr = libc::msghdr {
+            msg_name: dest_addr.as_ptr() as *mut _,
+            msg_namelen: dest_addr.len(),
+            msg_iov: data.as_ptr() as *mut _,
+            msg_iovlen: data.len(),
+            msg_control: &args as *const _ as *mut _,
+            msg_controllen: 0,
+            msg_flags: 0,
+        };
+
+        let mut recv_hdr = libc::msghdr {
+            msg_name: null_mut(),
+            msg_namelen: 0,
+            msg_iov: null_mut(),
+            msg_iovlen: 0,
+            msg_control: &args as *const _ as *mut _,
+            msg_controllen: size_of::<types::homa_recvmsg_args>(),
+            msg_flags: 0,
+        };
+
+        let result = unsafe { libc::sendmsg(self.socket.as_raw_fd(), &send_hdr, 0) };
+        if result < 0 {
+            log::error!("first");
+            return Err(Error::last_os_error());
+        }
+
+        let length = unsafe { libc::recvmsg(self.socket.as_raw_fd(), &mut recv_hdr, 0) };
+        if length < 0 {
+            log::error!("second");
+            return Err(Error::last_os_error());
+        }
+
+        let mut length: usize = length.try_into().unwrap();
+
+        let mut iovec = vec![];
+        for i in 0..args.num_bpages as usize {
+            let size = min(length, consts::HOMA_BPAGE_SIZE);
+            iovec.push(unsafe {
+                IoSlice::new(std::slice::from_raw_parts(
+                    self.buffer.as_ptr().offset(args.bpage_offsets[i] as isize),
+                    size,
+                ))
+            });
+            length -= size;
+        }
+
+        Ok(iovec)
     }
 
     pub fn send(
