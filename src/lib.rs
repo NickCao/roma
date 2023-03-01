@@ -1,7 +1,7 @@
 use libc::{c_void, size_t};
 use memmap2::{MmapMut, MmapOptions};
 use socket2::{Domain, SockAddr, Socket, Type};
-use std::cmp::max;
+use std::cmp::min;
 use std::io::{Error, IoSlice, Result};
 use std::net::SocketAddr;
 use std::os::fd::AsRawFd;
@@ -121,7 +121,7 @@ impl HomaSocket {
 
         let mut iovec = vec![];
         for i in 0..recvmsg_args.num_bpages as usize {
-            let size = max(length, HOMA_MAX_BPAGES);
+            let size = min(length, HOMA_MAX_BPAGES);
             iovec.push(unsafe {
                 IoSlice::new(std::slice::from_raw_parts(
                     self.buffer

@@ -5,14 +5,16 @@ use std::{io::IoSlice, net::SocketAddr};
 fn main() {
     let socket = HomaSocket::new(Domain::IPV4, 1000).unwrap();
     let dest: SocketAddr = "127.0.0.1:4000".parse().unwrap();
-    let data = [
-        IoSlice::new(b"hello"),
-        IoSlice::new(b"homa"),
-        IoSlice::new(b"amd"),
-        IoSlice::new(b"roma"),
-    ];
-    let id = socket.send(dest, &data, 0, 42).unwrap();
-    let resp = socket.recv(id, HOMA_RECVMSG_RESPONSE, &[]).unwrap();
-    dbg!(data);
-    dbg!(resp);
+    let mut buf = vec![];
+    for i in 90000..100000 {
+        let hello = b"hello".repeat(i);
+        let homa = b"homa".repeat(i);
+        let data = [IoSlice::new(&hello), IoSlice::new(&homa)];
+        let id = socket.send(dest, &data, 0, i as u64).unwrap();
+        let resp = socket.recv(id, HOMA_RECVMSG_RESPONSE, &buf).unwrap();
+        assert_eq!(i as u64, resp.1);
+        dbg!(&resp.2.len());
+        buf = resp.2;
+        // dbg!(data);
+    }
 }
