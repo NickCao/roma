@@ -8,7 +8,7 @@ use nix::{errno::Errno, sys::socket::SetSockOpt};
 #[allow(non_camel_case_types)]
 #[repr(C)]
 #[derive(Debug, Clone)]
-pub struct homa_set_buf_args {
+struct homa_set_buf_args {
     pub start: *mut c_void,
     pub length: size_t,
 }

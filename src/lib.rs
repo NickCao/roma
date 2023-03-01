@@ -3,7 +3,7 @@
 
 use libc::c_void;
 use memmap2::{MmapMut, MmapOptions};
-use nix::sys::socket::{setsockopt, SetSockOpt};
+use nix::sys::socket::{setsockopt};
 use socket2::{Domain, SockAddr, Socket, Type};
 use std::cmp::min;
 use std::io::{Error, IoSlice, Result};
