@@ -25,6 +25,7 @@ pub struct HomaSocket {
 
 impl HomaSocket {
     pub fn new(domain: Domain, pages: usize) -> Result<Self> {
+        log::debug!("HomaSocket::new(domain: {:?}, pages: {})", domain, pages);
         let socket = Socket::new_raw(domain, Type::DGRAM, Some(IPPROTO_HOMA.into()))?;
 
         let length = pages * HOMA_BPAGE_SIZE;
@@ -57,6 +58,13 @@ impl HomaSocket {
         id: u64,
         completion_cookie: u64,
     ) -> Result<u64> {
+        log::debug!(
+            "HomaSocket::send(dest_addr: {}, bufs: {}, id: {}, completion_cookie: {})",
+            dest_addr,
+            bufs.len(),
+            id,
+            completion_cookie
+        );
         let dest_addr: SockAddr = dest_addr.into();
         let sendmsg_args = homa_sendmsg_args {
             id,
