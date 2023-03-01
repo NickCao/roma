@@ -49,5 +49,5 @@ pub struct homa_abort_args {
     pub pad2: [u64; 2],
 }
 
-nix::ioctl_readwrite!(homa_abort, 0x89, 0xef, homa_abort_args);
+nix::ioctl_readwrite!(homa_abort, 0x89, 0xe3, homa_abort_args);
 nix::ioctl_none!(homa_freeze, 0x89, 0xef);

@@ -12,7 +12,6 @@ fn main() {
         let homa = b"homa".repeat(i);
         let data = [IoSlice::new(&hello), IoSlice::new(&homa)];
         let id = socket.send(dest, &data, 0, i as u64).unwrap();
-        socket.abort(1, 0).unwrap();
         let resp = socket
             .recv(id, consts::HOMA_RECVMSG_RESPONSE, &buf)
             .unwrap();
