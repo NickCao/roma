@@ -7,7 +7,7 @@ fn main() {
     let socket = HomaSocket::new(Domain::IPV4, 1000).unwrap();
     let dest: SocketAddr = "127.0.0.1:4000".parse().unwrap();
     let mut buf = vec![];
-    for i in 100000..200000 {
+    for i in 1..1000 {
         let hello = b"hello".repeat(i);
         let homa = b"homa".repeat(i);
         let data = [IoSlice::new(&hello), IoSlice::new(&homa)];

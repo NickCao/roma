@@ -1,6 +1,8 @@
 #![feature(int_roundings)]
 #![feature(default_free_fn)]
 
+use io_uring::types::Fd;
+use io_uring::{cqueue, opcode, squeue, IoUring};
 use libc::c_void;
 use memmap2::{MmapMut, MmapOptions};
 use nix::sys::socket::setsockopt;
@@ -84,17 +86,29 @@ impl HomaSocket {
             msg_flags: 0,
         };
 
-        let result = unsafe { libc::sendmsg(self.socket.as_raw_fd(), &send_hdr, 0) };
-        if result < 0 {
-            log::error!("first");
-            return Err(Error::last_os_error());
-        }
+        let opsend = opcode::SendMsg::new(Fd(self.socket.as_raw_fd()), &send_hdr)
+            .build()
+            .user_data(1)
+            .flags(squeue::Flags::IO_LINK);
+        let oprecv = opcode::RecvMsg::new(Fd(self.socket.as_raw_fd()), &mut recv_hdr)
+            .build()
+            .user_data(2);
 
-        let length = unsafe { libc::recvmsg(self.socket.as_raw_fd(), &mut recv_hdr, 0) };
-        if length < 0 {
-            log::error!("second");
-            return Err(Error::last_os_error());
+        let mut ring = IoUring::new(8)?;
+        unsafe {
+            let mut queue = ring.submission();
+            queue.push(&opsend).unwrap();
+            queue.push(&oprecv).unwrap();
         }
+        ring.submit_and_wait(2).unwrap();
+
+        dbg!(&args);
+
+        let cq: Vec<cqueue::Entry> = ring.completion().into_iter().collect();
+        dbg!(&cq);
+        assert_eq!(cq.len(), 2);
+
+        let length = cq.last().unwrap().result();
 
         let mut length: usize = length.try_into().unwrap();
 
