@@ -121,7 +121,7 @@ impl HomaSocket {
 
         let mut iovec = vec![];
         for i in 0..recvmsg_args.num_bpages as usize {
-            let size = min(length, HOMA_MAX_BPAGES);
+            let size = min(length, HOMA_BPAGE_SIZE);
             iovec.push(unsafe {
                 IoSlice::new(std::slice::from_raw_parts(
                     self.buffer
