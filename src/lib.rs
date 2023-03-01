@@ -51,11 +51,12 @@ impl HomaSocket {
 
     pub fn send(
         &self,
-        dest_addr: &SockAddr,
+        dest_addr: SocketAddr,
         bufs: &[IoSlice<'_>],
         id: u64,
         completion_cookie: u64,
     ) -> Result<u64> {
+        let dest_addr: SockAddr = dest_addr.into();
         let sendmsg_args = homa_sendmsg_args {
             id,
             completion_cookie,

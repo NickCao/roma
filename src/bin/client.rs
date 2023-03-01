@@ -7,7 +7,7 @@ fn main() {
     let dest: SocketAddr = "127.0.0.1:4000".parse().unwrap();
     let result = socket
         .send(
-            &dest.into(),
+            dest,
             &[
                 IoSlice::new(b"hello"),
                 IoSlice::new(b"homa"),
