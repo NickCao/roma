@@ -3,13 +3,15 @@
 
 use libc::c_void;
 use memmap2::{MmapMut, MmapOptions};
-use nix::sys::socket::SetSockOpt;
+use nix::sys::socket::{setsockopt, SetSockOpt};
 use socket2::{Domain, SockAddr, Socket, Type};
 use std::cmp::min;
 use std::io::{Error, IoSlice, Result};
 use std::net::SocketAddr;
 use std::os::fd::AsRawFd;
 use std::{ffi::c_int, mem::size_of};
+
+use crate::types::HomaBuf;
 
 pub mod consts;
 pub mod types;
@@ -27,19 +29,7 @@ impl HomaSocket {
         let length = pages * consts::HOMA_BPAGE_SIZE;
         let buffer = MmapOptions::new().len(length).map_anon()?;
 
-        let set_buf_args = types::homa_set_buf_args::from(&buffer);
-
-        let result = unsafe {
-            libc::setsockopt(
-                socket.as_raw_fd(),
-                consts::IPPROTO_HOMA,
-                consts::SO_HOMA_SET_BUF,
-                &set_buf_args as *const types::homa_set_buf_args as *const c_void,
-                size_of::<types::homa_set_buf_args>() as u32,
-            )
-        };
-
-        assert!(result >= 0);
+        setsockopt(socket.as_raw_fd(), HomaBuf, &buffer).unwrap();
 
         Ok(Self { socket, buffer })
     }
