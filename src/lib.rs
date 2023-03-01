@@ -1,3 +1,4 @@
+#![feature(int_roundings)]
 use libc::{c_void, size_t};
 use memmap2::{MmapMut, MmapOptions};
 use socket2::{Domain, SockAddr, Socket, Type};
@@ -6,6 +7,9 @@ use std::io::{Error, IoSlice, Result};
 use std::net::SocketAddr;
 use std::os::fd::AsRawFd;
 use std::{ffi::c_int, mem::size_of};
+
+pub mod types;
+pub mod consts;
 
 pub const IPPROTO_HOMA: i32 = 0xFD;
 pub const SO_HOMA_SET_BUF: i32 = 10;
