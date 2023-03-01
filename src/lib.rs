@@ -17,7 +17,7 @@ pub mod consts;
 pub mod types;
 
 pub struct HomaSocket {
-    socket: Socket,
+    pub socket: Socket,
     buffer: MmapMut,
 }
 
