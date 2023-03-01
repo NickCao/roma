@@ -1,7 +1,7 @@
 use libc::{c_void, size_t};
 use memmap2::{Mmap, MmapMut, MmapOptions};
-use socket2::{Domain, Socket, Type};
-use std::io::{Error, ErrorKind, Result};
+use socket2::{Domain, SockAddr, Socket, Type};
+use std::io::{Error, ErrorKind, IoSlice, Result};
 use std::os::fd::AsRawFd;
 use std::{ffi::c_int, isize, mem::size_of, ptr::addr_of_mut};
 
@@ -45,6 +45,33 @@ impl HomaSocket {
         assert!(result >= 0);
 
         Ok(Self { socket, buffer })
+    }
+
+    pub fn send(
+        &self,
+        dest_addr: &SockAddr,
+        bufs: &[IoSlice<'_>],
+        id: u64,
+        completion_cookie: u64,
+    ) -> Result<u64> {
+        let sendmsg_args = homa_sendmsg_args {
+            id,
+            completion_cookie,
+        };
+        let hdr = libc::msghdr {
+            msg_name: dest_addr.as_ptr() as *mut _,
+            msg_namelen: dest_addr.len(),
+            msg_iov: bufs.as_ptr() as *mut _,
+            msg_iovlen: bufs.len(),
+            msg_control: &sendmsg_args as *const _ as *mut _,
+            msg_controllen: 0,
+            msg_flags: 0,
+        };
+        let result = unsafe { libc::sendmsg(self.socket.as_raw_fd(), &hdr, 0) };
+        if result < 0 {
+            return Err(Error::last_os_error());
+        }
+        Ok(sendmsg_args.id)
     }
 }
 
