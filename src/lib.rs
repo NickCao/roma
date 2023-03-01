@@ -92,6 +92,12 @@ impl HomaSocket {
         flags: c_int,
         bufs: &[IoSlice<'_>],
     ) -> Result<(u64, u64, Vec<IoSlice<'_>>, Option<SocketAddr>)> {
+        log::debug!(
+            "HomaSocket::recv(id: {}, flags: {}, bufs: {})",
+            id,
+            flags,
+            bufs.len(),
+        );
         let src_addr: libc::sockaddr_storage = unsafe { std::mem::zeroed() };
 
         let mut bpage_offsets = [0; HOMA_MAX_BPAGES];
