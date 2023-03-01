@@ -1,9 +1,10 @@
 use libc::{c_void, size_t};
-use memmap2::{Mmap, MmapMut, MmapOptions};
+use memmap2::{MmapMut, MmapOptions};
 use socket2::{Domain, SockAddr, Socket, Type};
-use std::io::{Error, ErrorKind, IoSlice, Result};
+use std::cmp::max;
+use std::io::{Error, IoSlice, Result};
 use std::os::fd::AsRawFd;
-use std::{ffi::c_int, isize, mem::size_of, ptr::addr_of_mut};
+use std::{ffi::c_int, mem::size_of};
 
 pub const IPPROTO_HOMA: i32 = 0xFD;
 pub const SO_HOMA_SET_BUF: i32 = 10;
@@ -73,10 +74,64 @@ impl HomaSocket {
         }
         Ok(sendmsg_args.id)
     }
+
+    pub fn recv(&self, id: u64, flags: c_int, bufs: &[IoSlice<'_>]) -> Result<Vec<IoSlice<'_>>> {
+        let src_addr: libc::sockaddr_storage = unsafe { std::mem::zeroed() };
+
+        let mut bpage_offsets = [0; HOMA_MAX_BPAGES];
+        unsafe {
+            let bufs: Vec<u32> = bufs
+                .iter()
+                .map(|x| x.as_ptr().offset_from(self.buffer.as_ptr()) as u32)
+                .collect();
+            bpage_offsets[..bufs.len()].copy_from_slice(&bufs);
+        }
+
+        let recvmsg_args = homa_recvmsg_args {
+            id,
+            completion_cookie: 0,
+            flags,
+            num_bpages: bufs.len() as u32,
+            pad: [0; 2],
+            bpage_offsets,
+        };
+        let mut hdr = libc::msghdr {
+            msg_name: &src_addr as *const _ as *mut _,
+            msg_namelen: size_of::<libc::sockaddr_storage>() as u32,
+            msg_iov: std::ptr::null_mut() as *mut _,
+            msg_iovlen: 0,
+            msg_control: &recvmsg_args as *const _ as *mut c_void,
+            msg_controllen: size_of::<homa_recvmsg_args>(),
+            msg_flags: 0,
+        };
+
+        let length = unsafe { libc::recvmsg(self.socket.as_raw_fd(), &mut hdr, 0) };
+        if length < 0 {
+            return Err(Error::last_os_error());
+        }
+        let mut length: usize = length.try_into().unwrap();
+
+        let mut iovec = vec![];
+        for i in 0..recvmsg_args.num_bpages as usize {
+            let size = max(length, HOMA_MAX_BPAGES);
+            iovec.push(unsafe {
+                IoSlice::new(std::slice::from_raw_parts(
+                    self.buffer
+                        .as_ptr()
+                        .offset(recvmsg_args.bpage_offsets[i] as isize),
+                    size,
+                ))
+            });
+            length -= size;
+        }
+
+        Ok(iovec)
+    }
 }
 
 #[allow(non_camel_case_types)]
 #[repr(C)]
+#[derive(Debug)]
 pub struct homa_set_buf_args {
     pub start: *mut c_void,
     pub length: size_t,
@@ -84,6 +139,7 @@ pub struct homa_set_buf_args {
 
 #[allow(non_camel_case_types)]
 #[repr(C)]
+#[derive(Debug)]
 pub struct homa_sendmsg_args {
     id: u64,
     completion_cookie: u64,
@@ -91,6 +147,7 @@ pub struct homa_sendmsg_args {
 
 #[allow(non_camel_case_types)]
 #[repr(C)]
+#[derive(Debug)]
 pub struct homa_recvmsg_args {
     pub id: u64,
     pub completion_cookie: u64,
@@ -98,8 +155,4 @@ pub struct homa_recvmsg_args {
     pub num_bpages: u32,
     pub pad: [u32; 2],
     pub bpage_offsets: [u32; HOMA_MAX_BPAGES],
-}
-
-pub fn homa_socket(domain: c_int) -> i32 {
-    unsafe { libc::socket(domain, libc::SOCK_DGRAM, IPPROTO_HOMA) }
 }
