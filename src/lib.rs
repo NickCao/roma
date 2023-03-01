@@ -16,6 +16,7 @@ pub const HOMA_MAX_BPAGES: usize =
     (HOMA_MAX_MESSAGE_LENGTH + HOMA_BPAGE_SIZE - 1) >> HOMA_BPAGE_SHIFT;
 
 pub const HOMA_RECVMSG_REQUEST: c_int = 0x01;
+pub const HOMA_RECVMSG_RESPONSE: c_int = 0x02;
 
 pub struct HomaSocket {
     pub socket: Socket,
@@ -82,7 +83,7 @@ impl HomaSocket {
         id: u64,
         flags: c_int,
         bufs: &[IoSlice<'_>],
-    ) -> Result<(Vec<IoSlice<'_>>, Option<SocketAddr>)> {
+    ) -> Result<(u64, Vec<IoSlice<'_>>, Option<SocketAddr>)> {
         let src_addr: libc::sockaddr_storage = unsafe { std::mem::zeroed() };
 
         let mut bpage_offsets = [0; HOMA_MAX_BPAGES];
@@ -132,7 +133,7 @@ impl HomaSocket {
             length -= size;
         }
 
-        Ok((iovec, unsafe {
+        Ok((recvmsg_args.id, iovec, unsafe {
             SockAddr::new(
                 src_addr,
                 size_of::<libc::sockaddr_storage>().try_into().unwrap(),
