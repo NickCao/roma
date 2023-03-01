@@ -3,6 +3,7 @@ use memmap2::{MmapMut, MmapOptions};
 use socket2::{Domain, SockAddr, Socket, Type};
 use std::cmp::max;
 use std::io::{Error, IoSlice, Result};
+use std::net::SocketAddr;
 use std::os::fd::AsRawFd;
 use std::{ffi::c_int, mem::size_of};
 
@@ -75,7 +76,12 @@ impl HomaSocket {
         Ok(sendmsg_args.id)
     }
 
-    pub fn recv(&self, id: u64, flags: c_int, bufs: &[IoSlice<'_>]) -> Result<Vec<IoSlice<'_>>> {
+    pub fn recv(
+        &self,
+        id: u64,
+        flags: c_int,
+        bufs: &[IoSlice<'_>],
+    ) -> Result<(Vec<IoSlice<'_>>, Option<SocketAddr>)> {
         let src_addr: libc::sockaddr_storage = unsafe { std::mem::zeroed() };
 
         let mut bpage_offsets = [0; HOMA_MAX_BPAGES];
@@ -125,7 +131,13 @@ impl HomaSocket {
             length -= size;
         }
 
-        Ok(iovec)
+        Ok((iovec, unsafe {
+            SockAddr::new(
+                src_addr,
+                size_of::<libc::sockaddr_storage>().try_into().unwrap(),
+            )
+            .as_socket()
+        }))
     }
 }
 
