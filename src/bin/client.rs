@@ -1,4 +1,4 @@
-use roma::*;
+use roma::{consts, *};
 use socket2::Domain;
 use std::{io::IoSlice, net::SocketAddr};
 
@@ -12,7 +12,9 @@ fn main() {
         let homa = b"homa".repeat(i);
         let data = [IoSlice::new(&hello), IoSlice::new(&homa)];
         let id = socket.send(dest, &data, 0, i as u64).unwrap();
-        let resp = socket.recv(id, HOMA_RECVMSG_RESPONSE, &buf).unwrap();
+        let resp = socket
+            .recv(id, consts::HOMA_RECVMSG_RESPONSE, &buf)
+            .unwrap();
         assert_eq!(i as u64, resp.1);
         buf = resp.2;
     }

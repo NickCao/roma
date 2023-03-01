@@ -13,8 +13,8 @@ pub struct homa_set_buf_args {
 #[repr(C)]
 #[derive(Debug)]
 pub struct homa_sendmsg_args {
-    id: u64,
-    completion_cookie: u64,
+    pub id: u64,
+    pub completion_cookie: u64,
 }
 
 #[allow(non_camel_case_types)]

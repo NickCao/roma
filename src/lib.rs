@@ -1,5 +1,5 @@
 #![feature(int_roundings)]
-use libc::{c_void, size_t};
+use libc::c_void;
 use memmap2::{MmapMut, MmapOptions};
 use socket2::{Domain, SockAddr, Socket, Type};
 use std::cmp::min;
@@ -8,19 +8,8 @@ use std::net::SocketAddr;
 use std::os::fd::AsRawFd;
 use std::{ffi::c_int, mem::size_of};
 
-pub mod types;
 pub mod consts;
-
-pub const IPPROTO_HOMA: i32 = 0xFD;
-pub const SO_HOMA_SET_BUF: i32 = 10;
-pub const HOMA_BPAGE_SHIFT: usize = 16;
-pub const HOMA_BPAGE_SIZE: usize = 1 << HOMA_BPAGE_SHIFT;
-pub const HOMA_MAX_MESSAGE_LENGTH: usize = 1000000;
-pub const HOMA_MAX_BPAGES: usize =
-    (HOMA_MAX_MESSAGE_LENGTH + HOMA_BPAGE_SIZE - 1) >> HOMA_BPAGE_SHIFT;
-
-pub const HOMA_RECVMSG_REQUEST: c_int = 0x01;
-pub const HOMA_RECVMSG_RESPONSE: c_int = 0x02;
+pub mod types;
 
 pub struct HomaSocket {
     pub socket: Socket,
@@ -30,12 +19,12 @@ pub struct HomaSocket {
 impl HomaSocket {
     pub fn new(domain: Domain, pages: usize) -> Result<Self> {
         log::debug!("HomaSocket::new(domain: {:?}, pages: {})", domain, pages);
-        let socket = Socket::new_raw(domain, Type::DGRAM, Some(IPPROTO_HOMA.into()))?;
+        let socket = Socket::new_raw(domain, Type::DGRAM, Some(consts::IPPROTO_HOMA.into()))?;
 
-        let length = pages * HOMA_BPAGE_SIZE;
+        let length = pages * consts::HOMA_BPAGE_SIZE;
         let mut buffer = MmapOptions::new().len(length).map_anon()?;
 
-        let set_buf_args = homa_set_buf_args {
+        let set_buf_args = types::homa_set_buf_args {
             start: buffer.as_mut_ptr() as *mut c_void,
             length: buffer.len(),
         };
@@ -43,10 +32,10 @@ impl HomaSocket {
         let result = unsafe {
             libc::setsockopt(
                 socket.as_raw_fd(),
-                IPPROTO_HOMA,
-                SO_HOMA_SET_BUF,
-                &set_buf_args as *const homa_set_buf_args as *const c_void,
-                size_of::<homa_set_buf_args>() as u32,
+                consts::IPPROTO_HOMA,
+                consts::SO_HOMA_SET_BUF,
+                &set_buf_args as *const types::homa_set_buf_args as *const c_void,
+                size_of::<types::homa_set_buf_args>() as u32,
             )
         };
 
@@ -70,7 +59,7 @@ impl HomaSocket {
             completion_cookie
         );
         let dest_addr: SockAddr = dest_addr.into();
-        let sendmsg_args = homa_sendmsg_args {
+        let sendmsg_args = types::homa_sendmsg_args {
             id,
             completion_cookie,
         };
@@ -104,7 +93,7 @@ impl HomaSocket {
         );
         let src_addr: libc::sockaddr_storage = unsafe { std::mem::zeroed() };
 
-        let mut bpage_offsets = [0; HOMA_MAX_BPAGES];
+        let mut bpage_offsets = [0; consts::HOMA_MAX_BPAGES];
         unsafe {
             let bufs: Vec<u32> = bufs
                 .iter()
@@ -113,7 +102,7 @@ impl HomaSocket {
             bpage_offsets[..bufs.len()].copy_from_slice(&bufs);
         }
 
-        let recvmsg_args = homa_recvmsg_args {
+        let recvmsg_args = types::homa_recvmsg_args {
             id,
             completion_cookie: 0,
             flags,
@@ -127,7 +116,7 @@ impl HomaSocket {
             msg_iov: std::ptr::null_mut() as *mut _,
             msg_iovlen: 0,
             msg_control: &recvmsg_args as *const _ as *mut c_void,
-            msg_controllen: size_of::<homa_recvmsg_args>(),
+            msg_controllen: size_of::<types::homa_recvmsg_args>(),
             msg_flags: 0,
         };
 
@@ -139,7 +128,7 @@ impl HomaSocket {
 
         let mut iovec = vec![];
         for i in 0..recvmsg_args.num_bpages as usize {
-            let size = min(length, HOMA_BPAGE_SIZE);
+            let size = min(length, consts::HOMA_BPAGE_SIZE);
             iovec.push(unsafe {
                 IoSlice::new(std::slice::from_raw_parts(
                     self.buffer
@@ -164,32 +153,4 @@ impl HomaSocket {
             },
         ))
     }
-}
-
-#[allow(non_camel_case_types)]
-#[repr(C)]
-#[derive(Debug)]
-pub struct homa_set_buf_args {
-    pub start: *mut c_void,
-    pub length: size_t,
-}
-
-#[allow(non_camel_case_types)]
-#[repr(C)]
-#[derive(Debug)]
-pub struct homa_sendmsg_args {
-    id: u64,
-    completion_cookie: u64,
-}
-
-#[allow(non_camel_case_types)]
-#[repr(C)]
-#[derive(Debug)]
-pub struct homa_recvmsg_args {
-    pub id: u64,
-    pub completion_cookie: u64,
-    pub flags: c_int,
-    pub num_bpages: u32,
-    pub pad: [u32; 2],
-    pub bpage_offsets: [u32; HOMA_MAX_BPAGES],
 }
