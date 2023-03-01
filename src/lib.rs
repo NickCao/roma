@@ -1,8 +1,11 @@
 #![feature(int_roundings)]
+#![feature(default_free_fn)]
+
 use libc::c_void;
 use memmap2::{MmapMut, MmapOptions};
 use socket2::{Domain, SockAddr, Socket, Type};
 use std::cmp::min;
+use std::default::default;
 use std::io::{Error, IoSlice, Result};
 use std::net::SocketAddr;
 use std::os::fd::AsRawFd;
@@ -149,5 +152,19 @@ impl HomaSocket {
                 .as_socket()
             },
         ))
+    }
+
+    pub fn abort(&self, id: u64, error: c_int) -> nix::Result<i32> {
+        let mut abort_args = types::homa_abort_args {
+            id,
+            error,
+            pad1: default(),
+            pad2: default(),
+        };
+        unsafe { types::homa_abort(self.socket.as_raw_fd(), &mut abort_args) }
+    }
+
+    pub fn freeze(&self) -> nix::Result<i32> {
+        unsafe { types::homa_freeze(self.socket.as_raw_fd()) }
     }
 }

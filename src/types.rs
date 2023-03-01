@@ -50,3 +50,4 @@ pub struct homa_abort_args {
 }
 
 nix::ioctl_readwrite!(homa_abort, 0x89, 0xef, homa_abort_args);
+nix::ioctl_none!(homa_freeze, 0x89, 0xef);
