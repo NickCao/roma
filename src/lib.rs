@@ -89,7 +89,7 @@ impl HomaSocket {
         let opsend = opcode::SendMsg::new(Fd(self.socket.as_raw_fd()), &send_hdr)
             .build()
             .user_data(1)
-            .flags(squeue::Flags::IO_LINK);
+            .flags(squeue::Flags::IO_LINK | squeue::Flags::SKIP_SUCCESS);
         let oprecv = opcode::RecvMsg::new(Fd(self.socket.as_raw_fd()), &mut recv_hdr)
             .build()
             .user_data(2);
@@ -100,13 +100,13 @@ impl HomaSocket {
             queue.push(&opsend).unwrap();
             queue.push(&oprecv).unwrap();
         }
-        ring.submit_and_wait(2).unwrap();
+        ring.submit_and_wait(1).unwrap();
 
         dbg!(&args);
 
         let cq: Vec<cqueue::Entry> = ring.completion().into_iter().collect();
         dbg!(&cq);
-        assert_eq!(cq.len(), 2);
+        assert_eq!(cq.len(), 1);
 
         let length = cq.last().unwrap().result();
 
