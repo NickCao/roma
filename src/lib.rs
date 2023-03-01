@@ -83,7 +83,7 @@ impl HomaSocket {
         id: u64,
         flags: c_int,
         bufs: &[IoSlice<'_>],
-    ) -> Result<(u64, Vec<IoSlice<'_>>, Option<SocketAddr>)> {
+    ) -> Result<(u64, u64, Vec<IoSlice<'_>>, Option<SocketAddr>)> {
         let src_addr: libc::sockaddr_storage = unsafe { std::mem::zeroed() };
 
         let mut bpage_offsets = [0; HOMA_MAX_BPAGES];
@@ -133,13 +133,18 @@ impl HomaSocket {
             length -= size;
         }
 
-        Ok((recvmsg_args.id, iovec, unsafe {
-            SockAddr::new(
-                src_addr,
-                size_of::<libc::sockaddr_storage>().try_into().unwrap(),
-            )
-            .as_socket()
-        }))
+        Ok((
+            recvmsg_args.id,
+            recvmsg_args.completion_cookie,
+            iovec,
+            unsafe {
+                SockAddr::new(
+                    src_addr,
+                    size_of::<libc::sockaddr_storage>().try_into().unwrap(),
+                )
+                .as_socket()
+            },
+        ))
     }
 }
 

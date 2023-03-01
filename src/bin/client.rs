@@ -14,5 +14,5 @@ fn main() {
     let id = socket.send(dest, &data, 0, 42).unwrap();
     let resp = socket.recv(id, HOMA_RECVMSG_RESPONSE, &[]).unwrap();
     dbg!(data);
-    dbg!(resp.1);
+    dbg!(resp);
 }
