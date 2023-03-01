@@ -3,7 +3,7 @@
 
 use libc::c_void;
 use memmap2::{MmapMut, MmapOptions};
-use nix::sys::socket::{setsockopt};
+use nix::sys::socket::setsockopt;
 use socket2::{Domain, SockAddr, Socket, Type};
 use std::cmp::min;
 use std::io::{Error, IoSlice, Result};
@@ -17,8 +17,8 @@ pub mod consts;
 pub mod types;
 
 pub struct HomaSocket {
-    pub socket: Socket,
-    pub buffer: MmapMut,
+    socket: Socket,
+    buffer: MmapMut,
 }
 
 impl HomaSocket {
