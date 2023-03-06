@@ -1,18 +1,17 @@
 #![feature(int_roundings)]
 #![feature(default_free_fn)]
 
-use libc::c_void;
+
 use memmap2::{MmapMut, MmapOptions};
 use nix::sys::socket::setsockopt;
 use socket2::{Domain, SockAddr, Socket, Type};
 use std::cmp::min;
 use std::collections::VecDeque;
-use std::io::{Error, IoSlice, Result};
-use std::net::SocketAddr;
+use std::io::{Error, ErrorKind, IoSlice, Result};
+
 use std::os::fd::AsRawFd;
 use std::slice;
 use std::{ffi::c_int, mem::size_of};
-
 
 use crate::types::HomaBuf;
 
@@ -21,13 +20,14 @@ pub mod types;
 
 pub struct HomaSocket {
     pub socket: Socket,
-    buf: MmapMut,
+    buffer: MmapMut,
     backlog: VecDeque<u32>,
 }
 
 impl HomaSocket {
     pub fn new(domain: Domain, pages: usize) -> Result<Self> {
         log::debug!("HomaSocket::new(domain: {:?}, pages: {})", domain, pages);
+
         let socket = Socket::new_raw(domain, Type::DGRAM, Some(consts::IPPROTO_HOMA.into()))?;
 
         let length = pages * consts::HOMA_BPAGE_SIZE;
@@ -37,83 +37,80 @@ impl HomaSocket {
 
         Ok(Self {
             socket,
-            buf: buffer,
+            buffer,
             backlog: VecDeque::default(),
         })
     }
 
-    pub fn send(
-        &self,
-        dest_addr: SocketAddr,
-        bufs: &[u8],
-        id: u64,
-        completion_cookie: u64,
-    ) -> Result<u64> {
+    pub fn send(&self, buf: &[u8], addr: SockAddr, id: u64, completion_cookie: u64) -> Result<u64> {
         log::debug!(
-            "HomaSocket::send(dest_addr: {}, bufs: {}, id: {}, completion_cookie: {})",
-            dest_addr,
-            bufs.len(),
+            "HomaSocket::send(buf.len(): {}, addr: {:?}, id: {}, completion_cookie: {})",
+            buf.len(),
+            addr,
             id,
             completion_cookie
         );
-        let dest_addr: SockAddr = dest_addr.into();
-        let sendmsg_args = types::homa_sendmsg_args {
+
+        let mut sendmsg_args = types::homa_sendmsg_args {
             id,
             completion_cookie,
         };
+
         let hdr = libc::msghdr {
-            msg_name: dest_addr.as_ptr() as *mut _,
-            msg_namelen: dest_addr.len(),
-            msg_iov: [IoSlice::new(bufs)].as_mut_ptr().cast(),
+            msg_name: addr.as_ptr().cast_mut().cast(),
+            msg_namelen: addr.len(),
+            msg_iov: [IoSlice::new(buf)].as_mut_ptr().cast(),
             msg_iovlen: 1,
-            msg_control: &sendmsg_args as *const _ as *mut _,
+            msg_control: (&mut sendmsg_args as *mut types::homa_sendmsg_args).cast(),
             msg_controllen: 0,
             msg_flags: 0,
         };
+
         let result = unsafe { libc::sendmsg(self.socket.as_raw_fd(), &hdr, 0) };
+
         if result < 0 {
             return Err(Error::last_os_error());
         }
+
         Ok(sendmsg_args.id)
     }
 
     pub fn recv(
         &mut self,
-        id: u64,
+        buf: &mut [u8],
         flags: consts::HomaRecvmsgFlags,
-        bufs: &mut [u8],
-    ) -> Result<(u64, u64, Option<SocketAddr>)> {
+        id: u64,
+    ) -> Result<(usize, SockAddr, u64, u64)> {
         log::debug!(
-            "HomaSocket::recv(id: {}, flags: {:?}, bufs: {})",
-            id,
+            "HomaSocket::recv(buf.len(): {}, flags: {:?}, id: {})",
+            buf.len(),
             flags,
-            bufs.len(),
+            id,
         );
-        let src_addr: libc::sockaddr_storage = unsafe { std::mem::zeroed() };
 
-        let ret = min(self.backlog.len(), consts::HOMA_MAX_BPAGES);
-        let bpages = self.backlog.drain(0..ret);
+        let num_bpages = min(self.backlog.len(), consts::HOMA_MAX_BPAGES);
+        let bpages: Vec<u32> = self.backlog.drain(0..num_bpages).collect();
 
         let mut bpage_offsets = [0; consts::HOMA_MAX_BPAGES];
-        for (i, bpage) in bpages.enumerate() {
-            bpage_offsets[i] = bpage;
-        }
+        bpage_offsets[..bpages.len()].copy_from_slice(&bpages);
 
-        let recvmsg_args = types::homa_recvmsg_args {
+        let mut recvmsg_args = types::homa_recvmsg_args {
             id,
             completion_cookie: 0,
             flags: flags.bits(),
-            num_bpages: ret.try_into().unwrap(),
+            num_bpages: num_bpages.try_into().unwrap(),
             pad: [0; 2],
             bpage_offsets,
         };
 
+        let mut addr: libc::sockaddr_storage = unsafe { std::mem::zeroed() };
+
         let mut hdr = libc::msghdr {
-            msg_name: &src_addr as *const _ as *mut _,
+            msg_name: (&mut addr as *mut libc::sockaddr_storage).cast(),
             msg_namelen: size_of::<libc::sockaddr_storage>() as u32,
             msg_iov: std::ptr::null_mut() as *mut _,
             msg_iovlen: 0,
-            msg_control: &recvmsg_args as *const _ as *mut c_void,
+            msg_control: (&mut recvmsg_args as *mut types::homa_recvmsg_args).cast(),
             msg_controllen: size_of::<types::homa_recvmsg_args>(),
             msg_flags: 0,
         };
@@ -125,10 +122,16 @@ impl HomaSocket {
                 0, // flags are ignored
             )
         };
+
         if length < 0 {
             return Err(Error::last_os_error());
         }
+
         let length: usize = length.try_into().unwrap();
+
+        if buf.len() < length {
+            return Err(Error::new(ErrorKind::OutOfMemory, "buffer too small"));
+        }
 
         for i in 0..recvmsg_args.num_bpages as usize {
             let len = if i != recvmsg_args.num_bpages as usize - 1 {
@@ -139,19 +142,23 @@ impl HomaSocket {
             let offset = recvmsg_args.bpage_offsets[i];
             unsafe {
                 self.backlog.push_back(offset);
-                let data = self.buf.as_ptr().offset(offset.try_into().unwrap());
-                bufs[i * consts::HOMA_BPAGE_SIZE..i * consts::HOMA_BPAGE_SIZE + len]
+                let data = self.buffer.as_ptr().offset(offset.try_into().unwrap());
+                buf[i * consts::HOMA_BPAGE_SIZE..i * consts::HOMA_BPAGE_SIZE + len]
                     .copy_from_slice(slice::from_raw_parts(data, len));
             }
         }
 
-        Ok((recvmsg_args.id, recvmsg_args.completion_cookie, unsafe {
-            SockAddr::new(
-                src_addr,
-                size_of::<libc::sockaddr_storage>().try_into().unwrap(),
-            )
-            .as_socket()
-        }))
+        Ok((
+            length,
+            unsafe {
+                SockAddr::new(
+                    addr,
+                    size_of::<libc::sockaddr_storage>().try_into().unwrap(),
+                )
+            },
+            recvmsg_args.id,
+            recvmsg_args.completion_cookie,
+        ))
     }
 
     pub fn abort(&self, id: u64, error: c_int) -> nix::Result<i32> {
