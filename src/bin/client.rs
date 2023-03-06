@@ -1,3 +1,4 @@
+use rand::{RngCore, SeedableRng};
 use roma::{consts::HomaRecvmsgFlags, *};
 use socket2::Domain;
 use std::net::SocketAddr;
@@ -10,15 +11,17 @@ fn main() {
 
     let mut buf = vec![0u8; consts::HOMA_MAX_MESSAGE_LENGTH];
 
-    for i in 100000..200000 {
-        let data = b"hello".repeat(i);
+    for i in 100000usize..200000 {
+        let mut rng = rand::rngs::StdRng::seed_from_u64(i.try_into().unwrap());
+        let mut src = vec![0u8; i];
+        rng.fill_bytes(&mut src);
 
-        let id = socket.send(&data, dest.into(), 0, 0).unwrap();
+        let id = socket.send(&src, dest.into(), 0, 0).unwrap();
 
         let (length, _, _, _) = socket
             .recv(&mut buf, HomaRecvmsgFlags::RESPONSE, id)
             .unwrap();
 
-        assert_eq!(data, buf[..length]);
+        assert_eq!(src, buf[..length]);
     }
 }
