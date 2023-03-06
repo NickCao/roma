@@ -1,6 +1,6 @@
-use roma::{consts, *};
+use roma::{consts::HomaRecvmsgFlags, *};
 use socket2::Domain;
-use std::net::SocketAddr;
+use std::{io::ErrorKind, net::SocketAddr};
 
 fn main() {
     env_logger::init();
@@ -10,10 +10,18 @@ fn main() {
 
     let mut bufs = vec![];
     loop {
-        let (id, _, nbufs, addr) = socket
-            .recv(0, consts::HomaRecvmsgFlags::REQUEST, &bufs)
-            .unwrap();
-        socket.send(addr.unwrap(), &nbufs, id, 0).unwrap();
-        bufs = nbufs;
+        let result = socket.recv(
+            0,
+            HomaRecvmsgFlags::REQUEST | HomaRecvmsgFlags::NONBLOCKING,
+            &bufs,
+        );
+        match result {
+            Ok((id, _, nbufs, addr)) => {
+                socket.send(addr.unwrap(), &nbufs, id, 0).unwrap();
+                bufs = nbufs;
+            }
+            Err(err) if err.kind() == ErrorKind::WouldBlock => continue,
+            Err(err) => panic!("{}", err),
+        }
     }
 }
