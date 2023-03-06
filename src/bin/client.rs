@@ -1,4 +1,4 @@
-use roma::*;
+use roma::{consts::HomaRecvmsgFlags, *};
 use socket2::Domain;
 use std::{io::IoSlice, net::SocketAddr};
 
@@ -11,7 +11,8 @@ fn main() {
         let hello = b"hello".repeat(i);
         let homa = b"homa".repeat(i);
         let data = [IoSlice::new(&hello), IoSlice::new(&homa)];
-        let nbuf = socket.roundtrip(dest, &data, &buf).unwrap();
-        buf = nbuf;
+        let id = socket.send(dest, &data, 0, 0).unwrap();
+        let (_, _, nbufs, _) = socket.recv(id, HomaRecvmsgFlags::RESPONSE, &buf).unwrap();
+        buf = nbufs;
     }
 }
