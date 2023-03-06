@@ -22,6 +22,7 @@ fn main() {
             .recv(&mut buf, HomaRecvmsgFlags::RESPONSE, id)
             .unwrap();
 
+        assert_eq!(src.len(), length);
         assert_eq!(src, buf[..length]);
     }
 }
