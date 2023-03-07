@@ -127,29 +127,31 @@ impl HomaSocket {
         }
 
         let length: usize = length.try_into().unwrap();
-        let length = length - 1;
 
-        if buf.len() < length {
+        if buf.len() < length - 1 {
             return Err(Error::new(ErrorKind::OutOfMemory, "buffer too small"));
         }
 
         for i in 0..recvmsg_args.num_bpages as usize {
-            let len = if i != recvmsg_args.num_bpages as usize - 1 {
-                consts::HOMA_BPAGE_SIZE
+            let (len, last) = if i != recvmsg_args.num_bpages as usize - 1 {
+                (consts::HOMA_BPAGE_SIZE, 0)
             } else {
-                length - consts::HOMA_BPAGE_SIZE * (recvmsg_args.num_bpages as usize - 1)
+                (
+                    length - consts::HOMA_BPAGE_SIZE * (recvmsg_args.num_bpages as usize - 1),
+                    1,
+                )
             };
             let offset = recvmsg_args.bpage_offsets[i];
             unsafe {
                 self.backlog.push_back(offset);
                 let data = self.buffer.as_ptr().offset(offset.try_into().unwrap());
-                buf[i * consts::HOMA_BPAGE_SIZE..i * consts::HOMA_BPAGE_SIZE + len]
-                    .copy_from_slice(slice::from_raw_parts(data, len));
+                buf[i * consts::HOMA_BPAGE_SIZE..i * consts::HOMA_BPAGE_SIZE + len - last]
+                    .copy_from_slice(slice::from_raw_parts(data, len - last));
             }
         }
 
         Ok((
-            length,
+            length - 1,
             unsafe {
                 SockAddr::new(
                     addr,
