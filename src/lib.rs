@@ -1,7 +1,6 @@
 #![feature(int_roundings)]
 #![feature(default_free_fn)]
 
-
 use memmap2::{MmapMut, MmapOptions};
 use nix::sys::socket::setsockopt;
 use socket2::{Domain, SockAddr, Socket, Type};
@@ -59,8 +58,8 @@ impl HomaSocket {
         let hdr = libc::msghdr {
             msg_name: addr.as_ptr().cast_mut().cast(),
             msg_namelen: addr.len(),
-            msg_iov: [IoSlice::new(buf)].as_mut_ptr().cast(),
-            msg_iovlen: 1,
+            msg_iov: [IoSlice::new(buf), IoSlice::new(&[0])].as_mut_ptr().cast(),
+            msg_iovlen: 2,
             msg_control: (&mut sendmsg_args as *mut types::homa_sendmsg_args).cast(),
             msg_controllen: 0,
             msg_flags: 0,
@@ -128,6 +127,7 @@ impl HomaSocket {
         }
 
         let length: usize = length.try_into().unwrap();
+        let length = length - 1;
 
         if buf.len() < length {
             return Err(Error::new(ErrorKind::OutOfMemory, "buffer too small"));
