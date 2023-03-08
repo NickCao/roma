@@ -123,8 +123,12 @@ impl HomaSocket {
         };
 
         if length < 0 {
-            log::debug!("recvmsg_args: {:?}", recvmsg_args);
-            return Err(Error::last_os_error());
+            let err = Error::last_os_error();
+            if err.kind() == ErrorKind::InvalidInput {
+                log::debug!("args: {:?}", recvmsg_args);
+                log::debug!("hdr: {:?}", hdr);
+            }
+            return Err(err);
         }
 
         let length: usize = length.try_into().unwrap();
