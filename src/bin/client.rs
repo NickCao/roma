@@ -11,7 +11,7 @@ fn main() {
 
     let mut buf = vec![0u8; consts::HOMA_MAX_MESSAGE_LENGTH];
 
-    for i in 100000usize..200000 {
+    for i in 0usize..200000 {
         let mut rng = rand::rngs::StdRng::seed_from_u64(i.try_into().unwrap());
         let mut src = vec![0u8; i];
         rng.fill_bytes(&mut src);
@@ -19,7 +19,7 @@ fn main() {
         let id = socket.send(&src, dest.into(), 0, 0).unwrap();
 
         let (length, _, _, _) = socket
-            .recv(&mut buf, HomaRecvmsgFlags::RESPONSE, id)
+            .recv(&mut buf, HomaRecvmsgFlags::empty(), id)
             .unwrap();
 
         assert_eq!(src.len(), length);
