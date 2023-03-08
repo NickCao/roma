@@ -11,7 +11,8 @@ fn main() {
 
     let mut buf = vec![0u8; consts::HOMA_MAX_MESSAGE_LENGTH];
 
-    for i in 0usize..200000 {
+    let mut i = 1;
+    while i < consts::HOMA_MAX_MESSAGE_LENGTH {
         let mut rng = rand::rngs::StdRng::seed_from_u64(i.try_into().unwrap());
         let mut src = vec![0u8; i];
         rng.fill_bytes(&mut src);
@@ -24,5 +25,7 @@ fn main() {
 
         assert_eq!(src.len(), length);
         assert_eq!(src, buf[..length]);
+
+        i *= 2
     }
 }
