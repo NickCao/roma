@@ -1,6 +1,7 @@
 #![feature(int_roundings)]
 #![feature(default_free_fn)]
 
+use libc::c_void;
 use memmap2::{MmapMut, MmapOptions};
 use nix::sys::socket::setsockopt;
 use socket2::{Domain, SockAddr, Socket, Type};
@@ -55,17 +56,20 @@ impl HomaSocket {
             completion_cookie,
         };
 
-        let hdr = libc::msghdr {
-            msg_name: addr.as_ptr().cast_mut().cast(),
+        let padding = vec![0];
+        let iovec = vec![IoSlice::new(buf), IoSlice::new(&padding)];
+
+        let mut hdr = libc::msghdr {
+            msg_name: addr.as_ptr() as *mut _,
             msg_namelen: addr.len(),
-            msg_iov: [IoSlice::new(buf), IoSlice::new(&[0])].as_mut_ptr().cast(),
+            msg_iov: iovec.as_ptr() as *mut _,
             msg_iovlen: 2,
             msg_control: (&mut sendmsg_args as *mut types::homa_sendmsg_args).cast(),
             msg_controllen: 0,
             msg_flags: 0,
         };
 
-        let result = unsafe { libc::sendmsg(self.socket.as_raw_fd(), &hdr, 0) };
+        let result = unsafe { libc::sendmsg(self.socket.as_raw_fd(), &mut hdr, 0) };
 
         if result < 0 {
             return Err(Error::last_os_error());
