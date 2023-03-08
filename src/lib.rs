@@ -123,6 +123,7 @@ impl HomaSocket {
         };
 
         if length < 0 {
+            log::debug!("recvmsg_args: {:?}", recvmsg_args);
             return Err(Error::last_os_error());
         }
 
